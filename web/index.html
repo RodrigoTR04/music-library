@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Music Library</title>
+<link rel="icon" href="data:,">
+<style>
+@font-face {
+  font-family: "Archivo";
+  src: url(/fonts/Archivo.ttf) format("truetype");
+  font-weight: 100 900; font-stretch: 62% 125%; font-display: swap;
+}
+
+@property --tone { syntax: "<color>"; inherits: true; initial-value: #888888; }
+
+/* Tokens. Paper-grey ground, near-white sleeves; the only strong colour on screen is the covers. */
+:root {
+  color-scheme: light dark;
+  --ground: #e3e5e8;
+  --sleeve: #f6f7f8;
+  --ink: #22252b;
+  --ink2: #565c6b;
+  --ink3: #7d8393;
+  --rule: #ccd0d6;
+  --wash: #d6d9de;           /* image placeholder, hover rows */
+  --mark: #2b5c9e;           /* focus + selected state */
+  --gap: #9a5806;            /* metadata gaps */
+  --tone-mix: 46%;           /* how much cover colour reaches the sleeve header */
+  --tone-base: #f6f7f8;
+  --gut: 28px;
+
+  --t-s: 14px; --t-b: 16.5px; --t-m: 21px; --t-l: 29px; --t-xl: 40px; --t-d: 62px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #2a2e35; --sleeve: #353a43; --ink: #eceef1; --ink2: #aab1be; --ink3: #8a91a0;
+    --rule: #484e5a; --wash: #424854; --mark: #8db4e8; --gap: #e0a04a;
+    --tone-mix: 44%; --tone-base: #2a2e35;
+  }
+}
+@media (max-width: 720px) { :root { --gut: 16px; --t-xl: 30px; --t-d: 42px; } }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--ground); color: var(--ink);
+  font: 400 var(--t-b)/1.45 "Archivo", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; text-align: left; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; border-radius: 2px; }
+::selection { background: var(--mark); color: var(--sleeve); }
+
+/* The type used for titles: Archivo pulled narrow and heavy, like a sleeve spine. */
+.face { font-stretch: 70%; font-weight: 700; letter-spacing: .005em; word-spacing: .16em; line-height: 1.08; }
+
+/* ---------- top bar ---------- */
+#top { position: sticky; top: 0; z-index: 5; background: var(--ground); border-bottom: 1px solid var(--rule); padding: 14px var(--gut) 12px; }
+.row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 28px; }
+.mark { font-size: 30px; font-stretch: 62%; font-weight: 800; margin-right: 8px; }
+#tabs { display: flex; gap: 22px; flex-wrap: wrap; }
+.tab { font-size: var(--t-m); font-stretch: 78%; font-weight: 650; color: var(--ink2); padding: 2px 0; border-bottom: 2px solid transparent; }
+.tab:hover { color: var(--ink); }
+.tab[aria-current=page] { color: var(--ink); border-bottom-color: var(--ink); }
+.setup-link { margin-left: auto; font-size: var(--t-s); color: var(--ink2); text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+.setup-link:hover { color: var(--ink); text-decoration-color: currentColor; }
+.tab small { font: 400 var(--t-s) "Archivo"; color: var(--ink3); margin-left: 6px; }
+#filters { margin-top: 12px; align-items: end; }
+#filters input[type=search] { flex: 1 1 260px; max-width: 420px; background: transparent; border: 0; border-bottom: 1px solid var(--ink3); border-radius: 0; padding: 6px 2px; font-size: var(--t-b); }
+#filters input::placeholder { color: var(--ink3); }
+#filters input:focus { border-bottom: 2px solid var(--mark); margin-bottom: -1px; outline: none; }
+
+/* Dropdowns: same underline field as the search box, and a capped, scrollable list in page colours. */
+.dd { position: relative; flex: none; min-width: 150px; }
+.dd-btn { display: block; width: 100%; max-width: 240px; padding: 6px 24px 6px 2px; border-bottom: 1px solid var(--ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237d8393' stroke-width='1.5'/%3E%3C/svg%3E") right 4px center no-repeat; }
+.dd-btn[aria-expanded=true], .dd-btn:focus-visible { border-bottom: 2px solid var(--mark); margin-bottom: -1px; outline: none; }
+.dd-list { position: absolute; z-index: 40; left: 0; min-width: max(100%, 240px); max-width: 360px; margin: 0; padding: 6px 0; list-style: none; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--sleeve); border: 1px solid var(--ink3); border-radius: 2px; box-shadow: 0 16px 40px rgba(0,0,0,.28); }
+.dd-list[hidden] { display: none; }
+.dd-list li { display: flex; justify-content: space-between; gap: 18px; padding: 7px 14px 7px 12px; cursor: pointer; border-left: 3px solid transparent; }
+.dd-list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-list li small { color: var(--ink3); font-size: var(--t-s); align-self: center; }
+.dd-list li.act { background: var(--wash); }
+.dd-list li[aria-selected=true] { font-weight: 650; border-left-color: var(--ink); }
+.count { margin-left: auto; color: var(--ink2); font-size: var(--t-s); padding-bottom: 7px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.chips:empty { display: none; }
+.chip { border: 1px solid var(--ink3); border-radius: 2px; padding: 2px 10px; font-size: var(--t-s); }
+.chip:hover { border-color: var(--ink); }
+
+main { padding: 26px var(--gut) 80px; }
+
+/* ---------- covers ---------- */
+.cover { display: block; width: 100%; aspect-ratio: 1; background: var(--wash); border-radius: 2px; overflow: hidden; }
+.cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cover.ph { display: grid; place-items: center; font: 800 40px/1 "Archivo"; font-stretch: 62%; color: rgba(255,255,255,.8); }
+.mosaic { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; aspect-ratio: 1; border-radius: 2px; overflow: hidden; background: var(--sleeve); }
+.mosaic .cover { aspect-ratio: auto; height: 100%; border-radius: 0; }
+.mosaic.m1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.mosaic.m2 { grid-template-rows: 1fr; }
+.mosaic.m3 .cover:first-child { grid-row: span 2; }
+
+/* ---------- the wall ---------- */
+.wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 34px 16px; }
+.item { display: block; align-self: start; width: 100%; content-visibility: auto; contain-intrinsic-size: 196px 290px; }
+.item:hover > .cover, .item:hover > .mosaic, .item:focus-visible > .cover, .item:focus-visible > .mosaic { box-shadow: 0 4px 0 var(--under, var(--ground)), 0 7px 0 var(--mark); }
+.item:focus-visible { outline: none; }
+.item .ti { margin-top: 10px; font-size: 19px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .ar { color: var(--ink2); font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .me { color: var(--ink3); font-size: var(--t-s); display: flex; gap: 12px; }
+.item .me .g { color: var(--mark); font-weight: 650; }
+
+.empty { max-width: 46ch; padding: 60px 0; color: var(--ink2); }
+.empty b { display: block; color: var(--ink); font-size: var(--t-l); margin-bottom: 6px; }
+.empty button { margin-top: 12px; text-decoration: underline; color: var(--ink); }
+
+/* ---------- tracks table ---------- */
+table { width: 100%; border-collapse: collapse; }
+th { position: sticky; top: var(--barh, 100px); z-index: 2; background: var(--ground); text-align: left; font-weight: 600; font-size: var(--t-s); color: var(--ink2); padding: 8px 10px; border-bottom: 1px solid var(--ink3); white-space: nowrap; cursor: pointer; user-select: none; }
+th:hover, th.sorted { color: var(--ink); }
+td { padding: 6px 10px; border-bottom: 1px solid var(--rule); max-width: 270px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--wash); }
+tbody tr:focus-visible { outline-offset: -2px; }
+.num { text-align: right; }
+.dim { color: var(--ink2); }
+td.thumb { width: 54px; padding: 4px 0 4px 4px; }
+td.thumb .cover { width: 42px; }
+td.t { font-weight: 560; }
+.flag { color: var(--ink3); display: inline-block; min-width: 24px; text-align: center; font-size: 19px; line-height: 1; vertical-align: middle; }
+.flag.on { color: var(--ink); }
+
+/* ---------- overview ---------- */
+.ov-head { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px 64px; align-items: end; margin-bottom: 56px; }
+.lede { font-size: var(--t-xl); line-height: 1.12; font-stretch: 72%; font-weight: 650; margin: 0; text-wrap: balance; }
+.ov-head p { margin: 0; color: var(--ink2); max-width: 54ch; }
+.ov-head .lede { color: var(--ink); max-width: none; }
+section { margin-bottom: 60px; }
+h2 { font-size: var(--t-l); margin: 0 0 4px; }
+h2 + p { color: var(--ink2); margin: 0 0 20px; max-width: 70ch; }
+.years { display: flex; align-items: flex-end; gap: 3px; min-height: 120px; padding-bottom: 3px; border-bottom: 1px solid var(--ink3); }
+.ycol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column-reverse; gap: 1px; }
+.ycol button { display: block; width: 100%; border-radius: 1px; }
+.ycol button:hover { outline: 2px solid var(--ink); outline-offset: 1px; position: relative; z-index: 1; }
+.yaxis { display: flex; gap: 3px; margin-top: 8px; font-size: var(--t-s); }
+.yaxis span { flex: 1 1 0; min-width: 0; position: relative; height: 1.4em; }
+.yaxis button { position: absolute; left: 0; color: var(--ink2); text-decoration: underline; text-underline-offset: 3px; font-size: var(--t-s); white-space: nowrap; }
+.yaxis button:hover { color: var(--ink); }
+.ov-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 72px; }
+@media (min-width: 1100px) { .ov-cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 900px) { .ov-head { grid-template-columns: minmax(0, 1fr); } }
+.list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink3); }
+.list li { display: grid; grid-template-columns: minmax(110px, 210px) minmax(0, 1fr) 4.6ch; align-items: center; gap: 16px; min-height: 46px; padding: 4px 0; border-bottom: 1px solid var(--rule); break-inside: avoid; }
+.list .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
+.list .nm:hover { text-decoration-color: currentColor; }
+.list .n { color: var(--ink2); text-align: right; }
+.strip { display: flex; gap: 1px; height: 24px; overflow: hidden; }
+.strip button { flex: 0 1 8px; min-width: 1px; height: 100%; border-radius: 1px; }
+.strip button:hover { outline: 2px solid var(--ink); outline-offset: 1px; position: relative; z-index: 1; }
+.tiny { display: flex; gap: 3px; min-width: 0; overflow: hidden; }
+.tiny .cover { width: 34px; flex: none; }
+.list.gaps { columns: 2 440px; column-gap: 72px; }
+.list.gaps li { grid-template-columns: minmax(130px, 250px) minmax(0, 1fr) 5.2ch 4ch; }
+.list.gaps .nm { white-space: normal; line-height: 1.25; }
+.gapbar { height: 10px; background: var(--wash); border-radius: 1px; overflow: hidden; }
+.gapbar i { display: block; height: 100%; background: var(--gap); }
+
+/* ---------- detail (shared) ---------- */
+.tint { background: color-mix(in oklab, var(--tone, var(--ink3)) var(--tone-mix), var(--tone-base)); }
+.btn { border: 1px solid var(--ink); border-radius: 2px; padding: 6px 14px; font-weight: 600; }
+.btn:hover { background: var(--ink); color: var(--sleeve); }
+.close { text-decoration: underline; text-underline-offset: 3px; padding: 4px 0; }
+.notes h1 { font-size: var(--t-d); margin: 0 0 6px; overflow-wrap: anywhere; }
+.notes .by { font-size: var(--t-m); margin-bottom: 14px; }
+.notes .by button, .notes .genres button { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in oklab, currentColor 35%, transparent); }
+.notes .by button:hover, .notes .genres button:hover { text-decoration-color: currentColor; }
+.notes p { margin: 0 0 6px; max-width: 62ch; }
+.notes .small { font-size: var(--t-s); color: var(--ink2); overflow-wrap: anywhere; }
+.notes .genres { margin: 10px 0; }
+.notes .genres button { margin-right: 14px; }
+.tl { width: 100%; }
+.tl td { max-width: none; }
+.tl td.n { width: 3.2em; color: var(--ink3); text-align: right; }
+.tl td.t { white-space: normal; overflow-wrap: anywhere; }
+.tl tr.sel { background: var(--wash); }
+.dbody h3 { font-size: var(--t-m); font-stretch: 78%; font-weight: 700; margin: 26px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--ink3); }
+.dbody h3:first-child { margin-top: 6px; }
+.kv { display: grid; grid-template-columns: minmax(110px, 160px) 1fr; gap: 6px 18px; margin: 0; }
+.kv dt { color: var(--ink2); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
+.kv a { text-underline-offset: 3px; }
+.lyrics { background: var(--ground); border-radius: 2px; padding: 14px 16px; max-height: 360px; overflow: auto; line-height: 1.75; max-width: 64ch; }
+.lyrics .ts { color: var(--ink3); margin-right: 10px; }
+.lyrics:not(.show-ts) .ts { display: none; }
+.linkbtn { text-decoration: underline; text-underline-offset: 3px; color: var(--ink2); margin: 8px 0; display: inline-block; }
+@media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+
+/* Candidate C: a gatefold dialog. Sleeve | tracks, and the spread opens wider for track metadata. */
+.gate { position: fixed; z-index: 31; inset: 0; margin: auto; width: min(1180px, 95vw); height: min(88vh, 900px); display: grid; grid-template-columns: 400px 1fr 0px; background: var(--sleeve); box-shadow: 0 30px 90px rgba(0,0,0,.45); border-radius: 2px; overflow: hidden; transform: scale(.5); opacity: 0; visibility: hidden; pointer-events: none;
+  transition: transform .32s cubic-bezier(.2,.7,.2,1), opacity .2s, width .36s cubic-bezier(.2,.7,.2,1), grid-template-columns .36s cubic-bezier(.2,.7,.2,1), --tone .45s ease, visibility 0s .32s; }
+.gate.on { transform: none; opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
+.gate.wide { width: min(1560px, 98vw); grid-template-columns: 400px 1fr 500px; }
+.gate > * { min-width: 0; overflow: auto; }
+.gate .c1 { padding: 18px var(--gut) 28px; display: flex; flex-direction: column; gap: 18px; }
+.gate .c1 .cover, .gate .c1 .mosaic { flex: none; }
+.gate .c2 .item .ti { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.gate .c2 { --under: var(--sleeve); }
+.gate .c2 .wall { padding: 24px var(--gut) 44px; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 30px 18px; }
+.gate .c1 .top { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; }
+.gate .notes h1 { font-size: clamp(32px, 3vw, 46px); }
+.gate .c2 .tl td { padding-top: 9px; padding-bottom: 9px; }
+.gate .c2 .tl td:last-child { padding-right: var(--gut); }
+.gate .c2 .tl td.n { padding-left: var(--gut); }
+.gate .c3 { border-left: 1px solid var(--rule); opacity: 0; pointer-events: none; transition: opacity .2s .14s; }
+.gate.wide .c3 { opacity: 1; pointer-events: auto; }
+.c3in { padding: 18px var(--gut) 70px; }
+.c3in h2 { font-size: var(--t-xl); margin: 10px 0 2px; }
+.c3in .dbody { margin-top: 26px; }
+.c3in p { margin: 0 0 4px; }
+#scrim { position: fixed; inset: 0; background: rgba(20,22,28,.5); z-index: 30; opacity: 0; pointer-events: none; transition: opacity .2s; }
+#scrim.on { opacity: 1; pointer-events: auto; }
+@media (min-width: 901px) and (max-width: 1320px) {
+  .gate.wide { width: min(1180px, 95vw); grid-template-columns: 340px 1fr 0px; }
+  .gate:not(.wide) { grid-template-columns: 340px 1fr 0px; }
+  .gate .c3 { position: absolute; top: 0; right: 0; bottom: 0; width: min(520px, 74%); background: var(--sleeve); box-shadow: -14px 0 34px rgba(0,0,0,.28); transform: translateX(104%); opacity: 1; transition: transform .3s cubic-bezier(.2,.7,.2,1); }
+  .gate.wide .c3 { transform: none; }
+}
+@media (max-width: 900px) {
+  .gate, .gate.wide { margin: 0; width: 100vw; height: 100dvh; grid-template-columns: 1fr; border-radius: 0; overflow: auto; transform: translateY(6%); }
+  .gate.on { transform: none; }
+  .gate > * { overflow: visible; }
+  .gate .c1 .cover { max-width: 200px; }
+  .gate .c3 { position: absolute; inset: 0; background: var(--sleeve); opacity: 1; transform: translateX(100%); transition: transform .26s; overflow: auto; }
+  .gate.wide .c3 { transform: none; }
+}
+</style>
+</head>
+<body>
+<header id="top">
+  <div class="row">
+    <span class="mark">Library</span>
+    <nav id="tabs" aria-label="Views">
+      <button class="tab" data-view="albums">Albums<small id="nAlbums"></small></button>
+      <button class="tab" data-view="artists">Artists<small id="nArtists"></small></button>
+      <button class="tab" data-view="tracks">Tracks<small id="nTracks"></small></button>
+      <button class="tab" data-view="overview">Overview</button>
+    </nav>
+    <a class="setup-link" href="/setup">Folders</a>
+  </div>
+  <div id="filterArea"></div>
+</header>
+<main id="main"></main>
+
+<div id="scrim"></div>
+<div id="detail" class="gate" role="dialog" aria-modal="true" aria-label="Album"></div>
+
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// With several folders in the library, every album outside the first one carries its folder's name.
+const badge = src => S.sources.length > 1 && src !== S.sources[0].label ? `<span class="g">${esc(src)}</span>` : "";
+const joinList = a => a.length < 2 ? a.join("") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+const cmp = (a, b) => collator.compare(a ?? "", b ?? "");
+const plural = (n, w) => `${n.toLocaleString()} ${w}${n === 1 ? "" : "s"}`;
+
+const fmtDur = s => {
+  s = Math.round(s || 0);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
+};
+const fmtLong = s => { const h = s / 3600; return h >= 1 ? `${h.toFixed(h < 10 ? 1 : 0)} hours` : `${Math.max(1, Math.round(s / 60))} min`; };
+const fmtSize = b => b >= 1e9 ? (b / 1e9).toFixed(2) + " GB" : b >= 1e6 ? (b / 1e6).toFixed(1) + " MB" : Math.round(b / 1e3) + " kB";
+const fmtDate = t => t ? new Date(t * 1000).toLocaleString() : "";
+const hue = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+
+/* ---------- state ---------- */
+const S = {
+  view: "albums",
+  f: { q: "", genre: "", range: null, flag: null },
+  albumSort: "artist", artistSort: "name",
+  tableSort: { col: "artist", dir: 1 },
+  inspecting: null,
+};
+
+// The server hands over finished tables (albums, artists, genres, years, flags, stats, cover colours);
+// loading only links them together by id.
+async function load() {
+  const res = await fetch("/api/library");
+  if (!res.ok) throw new Error("The server has no library yet");
+  Object.assign(S, await res.json());
+  S.byId = new Map(S.tracks.map(t => [t.id, t]));
+  S.albumById = new Map(S.albums.map(a => [a.id, a]));
+  S.artistById = new Map(S.artists.map(r => [r.id, r]));
+  S.flagByKey = new Map(S.flags.map(f => [f.key, f]));
+  for (const a of S.albums) a.tracks = a.track_ids.map(id => S.byId.get(id));
+  $("#nTracks").textContent = S.stats.tracks.toLocaleString();
+  $("#nAlbums").textContent = S.stats.albums.toLocaleString();
+  $("#nArtists").textContent = S.stats.artists.toLocaleString();
+}
+
+/* ---------- filtering ---------- */
+function matches(t, f = S.f) {
+  if (f.genre && !t.genres.includes(f.genre)) return false;
+  if (f.range && !(t.year >= f.range[0] && t.year <= f.range[1])) return false;
+  if (f.flag && !(t.flags & (1 << S.flagByKey.get(f.flag).bit))) return false;
+  if (f._terms) for (const w of f._terms) if (!t.search.includes(w)) return false;
+  return true;
+}
+function filtered() {
+  S.f._terms = S.f.q.toLowerCase().split(/\s+/).filter(Boolean);
+  return S.tracks.filter(t => matches(t));
+}
+const anyFilter = () => { const f = S.f; return !!(f.q || f.genre || f.range || f.flag); };
+function clearFilters() { S.f = { q: "", genre: "", range: null, flag: null }; render(); }
+
+/* ---------- pieces ---------- */
+function cover(hash, label, cls = "") {
+  if (hash) return `<span class="cover ${cls}"><img loading="lazy" decoding="async" alt="" width="256" height="256" src="/cover/${hash}.jpg"></span>`;
+  return `<span class="cover ph ${cls}" style="background:hsl(${hue(label)} 30% 38%)">${esc((label || "?").trim().charAt(0).toUpperCase())}</span>`;
+}
+function mosaic(hashes, label) {
+  const n = Math.min(4, Math.max(1, hashes.length));
+  return `<div class="mosaic m${n}">${(hashes.length ? hashes : [null]).map(h => cover(h, label)).join("")}</div>`;
+}
+
+/* ---------- views ---------- */
+function setView(v) {
+  S.view = v;
+  if (location.hash.slice(1) !== v) location.hash = v;
+  for (const b of document.querySelectorAll(".tab")) b.setAttribute("aria-current", b.dataset.view === v ? "page" : "false");
+  render();
+}
+
+function filterBarHTML() {
+  const d0 = Math.floor(S.stats.year_min / 10) * 10, d1 = Math.floor(S.stats.year_max / 10) * 10;
+  const decades = []; for (let d = d1; d >= d0; d -= 10) decades.push(d);
+  const rangeVal = S.f.range ? `${S.f.range[0]}-${S.f.range[1]}` : "";
+  const isDecade = decades.some(d => rangeVal === `${d}-${d + 9}`);
+  const sorts = S.view === "albums"
+    ? [["artist", "Artist"], ["title", "Album title"], ["year-", "Newest first"], ["year", "Oldest first"], ["tracks", "Most tracks"], ["duration", "Longest"], ["added", "Recently changed"]]
+    : S.view === "artists" ? [["name", "Name"], ["albums", "Most albums"], ["tracks", "Most tracks"], ["duration", "Longest"]] : null;
+  const cur = S.view === "albums" ? S.albumSort : S.artistSort;
+  const chips = [];
+  const chip = (what, key) => `<button class="chip" data-clear="${key}" aria-label="Remove filter: ${esc(what)}">${esc(what)} ×</button>`;
+  if (S.f.flag) chips.push(chip(S.flagByKey.get(S.f.flag).label, "flag"));
+  if (S.f.range && !isDecade) chips.push(chip("Year " + (S.f.range[0] === S.f.range[1] ? S.f.range[0] : rangeVal), "range"));
+  const genreOpts = [{ value: "", label: "All genres" }, ...S.genres.slice().sort((a, b) => cmp(a.name, b.name)).map(g => ({ value: g.name, label: g.name, n: g.n_tracks }))];
+  const yearOpts = [{ value: "", label: "Any decade" }, ...decades.map(d => ({ value: `${d}-${d + 9}`, label: `${d}s` }))];
+  return `<div class="row" id="filters">
+    <input type="search" id="q" aria-label="Search" placeholder="Search title, artist, album, genre, composer (press /)" value="${esc(S.f.q)}">
+    ${dropdownHTML("genreDD", "Genre", genreOpts, S.f.genre)}
+    ${dropdownHTML("yearDD", "Decade", yearOpts, isDecade ? rangeVal : "")}
+    ${sorts ? dropdownHTML("sortDD", "Sort", sorts.map(([v, l]) => ({ value: v, label: "Sort by " + l.toLowerCase() })), cur) : ""}
+    <span class="count" id="count" aria-live="polite"></span>
+  </div>
+  <div class="chips">${chips.join("")}</div>`;
+}
+
+function render() {
+  const main = $("#main"), fa = $("#filterArea");
+  if (S.view === "overview") { fa.innerHTML = ""; main.innerHTML = overviewHTML(); }
+  else {
+    const hadFocus = document.activeElement?.id === "q";
+    fa.innerHTML = filterBarHTML();
+    main.innerHTML = `<div id="content"></div>`;
+    renderContent();
+    if (hadFocus) { const q = $("#q"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+  }
+  document.documentElement.style.setProperty("--barh", $("#top").offsetHeight + "px");
+  window.scrollTo(0, 0);
+  if (typeof markSel === "function") markSel();
+}
+
+function emptyHTML(what) {
+  return `<div class="empty"><b>No ${what} match.</b>Loosen the search or remove a filter to see more.
+    ${anyFilter() ? `<br><button data-clearall="1">Clear all filters</button>` : ""}</div>`;
+}
+
+function renderContent() {
+  const rows = filtered();
+  const c = $("#content");
+  const n = S.view === "albums" ? renderAlbums(c, rows) : S.view === "artists" ? renderArtists(c, rows) : renderTracks(c, rows);
+  const unit = { albums: "album", artists: "artist", tracks: "track" }[S.view];
+  const cnt = $("#count");
+  if (cnt) cnt.textContent = plural(n, unit) + (S.view !== "tracks" ? `, ${plural(rows.length, "track")}` : "");
+  if (typeof markSel === "function") markSel();
+}
+
+const albumItem = (a, showArtist) => `
+    <button class="item" data-album="${a.id}" title="${esc(a.title)}">
+      ${cover(a.cover_hash, a.title)}
+      <div class="ti face">${esc(a.title)}</div>
+      ${showArtist ? `<div class="ar">${esc(a.album_artist)}</div>` : ""}
+      <div class="me"><span>${a.year || ""}</span><span>${plural(a.n_tracks, "track")}</span>${badge(a.source)}</div>
+    </button>`;
+
+function renderAlbums(c, rows) {
+  const ids = new Set(rows.map(t => t.album_id));
+  const list = S.albums.filter(a => ids.has(a.id));
+  const sorters = {
+    artist: (a, b) => cmp(a.album_artist, b.album_artist) || (a.year || 0) - (b.year || 0) || cmp(a.title, b.title),
+    title: (a, b) => cmp(a.title, b.title),
+    year: (a, b) => (a.year || 9999) - (b.year || 9999) || cmp(a.title, b.title),
+    "year-": (a, b) => (b.year || 0) - (a.year || 0) || cmp(a.title, b.title),
+    tracks: (a, b) => b.n_tracks - a.n_tracks,
+    duration: (a, b) => b.duration - a.duration,
+    added: (a, b) => b.mtime - a.mtime,
+  };
+  list.sort(sorters[S.albumSort]);
+  if (!list.length) { c.innerHTML = emptyHTML("albums"); return 0; }
+  c.innerHTML = `<div class="wall">${list.map(a => albumItem(a, true)).join("")}</div>`;
+  return list.length;
+}
+
+function renderArtists(c, rows) {
+  const ids = new Set(rows.map(t => t.artist_id));
+  const list = S.artists.filter(a => ids.has(a.id));
+  const sorters = {
+    name: (a, b) => cmp(a.name, b.name),
+    albums: (a, b) => b.n_albums - a.n_albums || cmp(a.name, b.name),
+    tracks: (a, b) => b.n_tracks - a.n_tracks || cmp(a.name, b.name),
+    duration: (a, b) => b.duration - a.duration,
+  };
+  list.sort(sorters[S.artistSort]);
+  if (!list.length) { c.innerHTML = emptyHTML("artists"); return 0; }
+  c.innerHTML = `<div class="wall">${list.map(a => `
+    <button class="item" data-artist="${a.id}">
+      ${mosaic(a.covers, a.name)}
+      <div class="ti face">${esc(a.name)}</div>
+      <div class="ar">${plural(a.n_albums, "album")}, ${plural(a.n_tracks, "track")}</div>
+      <div class="me"><span>${fmtLong(a.duration)}</span>${badge(a.source)}</div>
+    </button>`).join("")}</div>`;
+  return list.length;
+}
+
+const COLS = [
+  ["cover", "", "thumb", t => t.cover_hash ? cover(t.cover_hash, t.album) : ""],
+  ["track_no", "No.", "num dim", t => t.track_no || ""],
+  ["title", "Title", "t", t => esc(t.title)],
+  ["artist", "Artist", "dim", t => esc(t.artist)],
+  ["album", "Album", "dim", t => esc(t.album)],
+  ["year", "Year", "num dim", t => t.year || ""],
+  ["genre", "Genre", "dim", t => esc(t.genre)],
+  ["duration", "Time", "num", t => fmtDur(t.duration)],
+  ["bitrate", "kbps", "num dim", t => Math.round(t.bitrate / 1000)],
+  ["bpm", "BPM", "num dim", t => t.bpm || ""],
+  ["flags", "Tags", "", t => `<span class="flag ${t.has_lyrics ? "on" : ""}" title="${t.has_lyrics ? (t.lyrics_synced ? "Time-synced lyrics" : "Plain lyrics") : "No lyrics"}">${t.lyrics_synced ? "♪" : "¶"}</span><span class="flag ${t.has_mb ? "on" : ""}" title="${t.has_mb ? "Has MusicBrainz ids" : "No MusicBrainz ids"}">◈</span>`],
+];
+function renderTracks(c, rows) {
+  const { col, dir } = S.tableSort;
+  const get = col === "flags" ? t => (t.has_lyrics ? 1 : 0) + (t.has_mb ? 1 : 0) : t => t[col];
+  const blank = v => v == null || v === "";
+  rows = rows.slice().sort((a, b) => {
+    const x = get(a), y = get(b);
+    const r = blank(x) !== blank(y) ? (blank(x) ? 1 : -1) * dir : typeof x === "number" ? x - y : cmp(x, y);
+    return r * dir || cmp(a.artist, b.artist) || cmp(a.album, b.album) || (a.album_id - b.album_id) || (a.album_pos - b.album_pos);
+  });
+  if (!rows.length) { c.innerHTML = emptyHTML("tracks"); return 0; }
+  const sortable = COLS.filter(x => x[0] !== "cover");
+  c.innerHTML = `<table><thead><tr><th></th>${sortable.map(([k, l, cls]) => `<th data-col="${k}" class="${cls.includes("num") ? "num" : ""} ${col === k ? "sorted" : ""}" aria-sort="${col === k ? (dir > 0 ? "ascending" : "descending") : "none"}">${l}${col === k ? (dir > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}</tr></thead><tbody id="tbody"></tbody></table><div id="more"></div>`;
+  let shown = 0;
+  const more = () => {
+    const html = [];
+    for (const t of rows.slice(shown, shown + 250)) html.push(`<tr data-tid="${t.id}" tabindex="0">${COLS.map(([, , cls, f]) => `<td class="${cls}">${f(t)}</td>`).join("")}</tr>`);
+    $("#tbody").insertAdjacentHTML("beforeend", html.join(""));
+    shown += 250;
+    if (shown >= rows.length) io.disconnect();
+  };
+  const io = new IntersectionObserver(es => { if (es[0].isIntersecting) more(); }, { rootMargin: "800px" });
+  more(); io.observe($("#more"));
+  return rows.length;
+}
+
+/* ---------- overview ---------- */
+function overviewHTML() {
+  const st = S.stats, N = st.tracks;
+  const pct = n => Math.round(n / N * 100) + "%";
+  const y0 = st.year_min, y1 = st.year_max;
+  const byYear = new Map(S.years.map(y => [y.year, y]));
+  const peak = S.years.reduce((m, y) => y.n_albums > m.n_albums ? y : m, S.years[0] || { n_albums: 1 });
+  const pitch = Math.max(3, Math.min(15, Math.floor(280 / peak.n_albums))), bh = pitch - 1;
+  const swatchBtn = (id, extra = "") => { const a = S.albumById.get(id); return `<button data-album="${id}" style="background:${a.color || "#888"};${extra}" title="${esc(a.title)} by ${esc(a.album_artist)}" aria-label="${esc(a.title)}"></button>`; };
+  const cols = [], axis = [];
+  for (let y = y0; y <= y1; y++) {          // no years in the tags: y0 is undefined and the loop does not run
+    const r = byYear.get(y);
+    cols.push(`<div class="ycol">${r ? r.album_ids.map(id => swatchBtn(id, `height:${bh}px`)).join("") : ""}</div>`);
+    axis.push(y % 10 === 0 ? `<span><button data-decade="${y}">${y}</button></span>` : "<span></span>");
+  }
+  const TOP = 18;
+  const genres = S.genres.slice().sort((a, b) => b.n_tracks - a.n_tracks).slice(0, TOP);
+  const top = S.artists.slice().sort((a, b) => b.n_tracks - a.n_tracks).slice(0, TOP);
+  const facts = [
+    S.sources.length > 1 ? `That is ${joinList(S.sources.map(s => `${fmtLong(s.seconds)} in ${s.label}`))}.` : "",
+    st.avg_bitrate ? `Files average ${Math.round(st.avg_bitrate / 1000)} kbps` + (y0 ? `, and release years run from ${y0} to ${y1}.` : ".") : (y0 ? `Release years run from ${y0} to ${y1}.` : ""),
+  ].filter(Boolean).join(" ");
+  const gaps = S.flags.filter(f => f.n_tracks);
+  return `
+    <div class="ov-head">
+      <p class="lede face">${plural(N, "track")} on ${plural(st.albums, "album")} by ${plural(st.artists, "artist")}, ${fmtLong(st.seconds)} and ${fmtSize(st.bytes)}.</p>
+      <p>${esc(facts)}</p>
+    </div>
+
+    ${S.years.length ? `<section>
+      <h2 class="face">Albums by year, in the color of their cover</h2>
+      <p>One block per album. The busiest year is ${peak.year}, with ${peak.n_albums} albums. Select a block to open the album, or a decade to list its albums.</p>
+      <div class="years">${cols.join("")}</div>
+      <div class="yaxis">${axis.join("")}</div>
+    </section>` : ""}
+
+    <div class="ov-cols">
+      <section>
+        <h2 class="face">Genres</h2>
+        <p>${S.genres.length > TOP ? `The ${TOP} largest of ${S.genres.length}` : S.genres.length ? `All ${S.genres.length}` : "No genre tags were found"}, by track count. Each block is an album.</p>
+        <ul class="list">${genres.map(g => `<li><button class="nm" data-genre="${esc(g.name)}" title="${esc(g.name)}">${esc(g.name)}</button>
+          <span class="strip">${g.album_ids.map(id => swatchBtn(id)).join("")}</span>
+          <span class="n">${g.n_tracks.toLocaleString()}</span></li>`).join("")}</ul>
+      </section>
+      <section>
+        <h2 class="face">Most tracks</h2>
+        <p>${S.artists.length > TOP ? `The ${TOP} artists` : "The artists"} with the biggest share of the library, with their covers.</p>
+        <ul class="list">${top.map(a => `<li><button class="nm" data-artist="${a.id}" title="${esc(a.name)}">${esc(a.name)}</button>
+          <span class="tiny">${a.covers.map(h => cover(h, a.name)).join("")}</span><span class="n">${a.n_tracks.toLocaleString()}</span></li>`).join("")}</ul>
+      </section>
+    </div>
+
+    <section>
+      <h2 class="face">Gaps in the tags</h2>
+      <p>${gaps.length ? "How many tracks are missing each piece of information. Select a row to list those tracks." : "Every track has all the tags this app checks for."}</p>
+      <ul class="list gaps">${gaps.map(f => `<li><button class="nm" data-flag="${f.key}">${esc(f.label)}</button>
+        <span class="gapbar"><i style="width:${f.n_tracks / N * 100}%"></i></span><span class="n">${f.n_tracks.toLocaleString()}</span><span class="n">${pct(f.n_tracks)}</span></li>`).join("")}</ul>
+    </section>`;
+}
+
+/* ---------- shared detail pieces ---------- */
+const kv = rows => `<dl class="kv">${rows.filter(r => r[1] !== null && r[1] !== undefined && r[1] !== "").map(([k, v, raw]) => `<dt>${esc(k)}</dt><dd>${raw ? v : esc(v)}</dd>`).join("")}</dl>`;
+const lyricsFlag = t => `<span class="flag ${t.has_lyrics ? "on" : ""}" title="${t.has_lyrics ? (t.lyrics_synced ? "Time-synced lyrics" : "Plain lyrics") : "No lyrics"}">${t.lyrics_synced ? "♪" : "¶"}</span>`;
+
+function notesHTML(a) {
+  const multi = S.artistById.get(a.artist_id).n_albums > 1;
+  return `<div class="by">${multi ? `<button data-artist="${a.artist_id}">${esc(a.album_artist)}</button>` : esc(a.album_artist)}</div>
+    <p>${[a.year, plural(a.n_tracks, "track"), fmtLong(a.duration), fmtSize(a.file_size)].filter(Boolean).join(", ")}</p>
+    ${a.genres.length ? `<div class="genres">${a.genres.map(g => `<button data-genre="${esc(g)}">${esc(g)}</button>`).join("")}</div>` : ""}
+    ${a.copyright ? `<p class="small">${esc(a.copyright)}</p>` : ""}
+    ${a.label ? `<p class="small">Label: ${esc(a.label)}</p>` : ""}
+    <p class="small">${esc([a.source, a.folder].filter(Boolean).join("/"))}</p>`;
+}
+
+function tracklistHTML(a) {
+  return `<table class="tl"><tbody>${a.tracks.map(t => `
+    <tr data-tid="${t.id}" tabindex="0">
+      <td class="n">${t.disc_total > 1 ? `${t.disc_no || 1}.` : ""}${t.track_no || ""}</td>
+      <td class="t">${esc(t.title)}${t.artist && t.artist !== a.album_artist ? `<div class="dim" style="font-size:14.5px;font-weight:400">${esc(t.artist)}</div>` : ""}</td>
+      <td class="num dim">${t.bpm ? t.bpm + " bpm" : ""}</td>
+      <td>${lyricsFlag(t)}</td>
+      <td class="num">${fmtDur(t.duration)}</td>
+    </tr>`).join("")}</tbody></table>`;
+}
+
+// Every metadata section for one track, as an HTML string.
+async function trackBodyHTML(id) {
+  const t = await (await fetch(`/api/track/${id}`)).json();
+  const hasLyrics = !!t.lyrics, synced = !!t.lyrics_synced && hasLyrics;
+  const stamp = /^\s*(\[\d+:\d+(?:\.\d+)?\])+/;
+  const lyricHTML = hasLyrics ? t.lyrics.split(/\r?\n/).map(l => {
+    const m = synced && l.match(stamp);
+    return `<div>${m ? `<span class="ts">${esc(m[0].trim())}</span>` : ""}${esc(m ? l.slice(m[0].length) : l) || "&nbsp;"}</div>`;
+  }).join("") : "";
+  return `
+    <div class="dbody">
+      <h3>Tags</h3>
+      ${kv([["Title", t.title], ["Artist", t.artist], ["Album", t.album],
+        ["Track", t.track_no ? `${t.track_no}${t.track_total ? " of " + t.track_total : ""}` : null],
+        ["Disc", t.disc_no ? `${t.disc_no}${t.disc_total ? " of " + t.disc_total : ""}` : null],
+        ["Date", t.date_raw], ["Original date", t.original_date], ["Genre", t.genre],
+        ["BPM", t.bpm], ["Key", t.musical_key], ["Publisher", t.publisher]])}
+      <h3>Audio</h3>
+      ${kv([["Format", [t.codec, t.tag_format].filter(Boolean).join(", ")],
+        ["Duration", `${fmtDur(t.duration)} (${t.duration.toFixed(2)} s)`],
+        ["Bitrate", t.bitrate ? `${Math.round(t.bitrate / 1000)} kbps${t.bitrate_mode ? " " + t.bitrate_mode : ""}` : null],
+        ["Sample rate", t.sample_rate ? `${t.sample_rate} Hz${t.bit_depth ? `, ${t.bit_depth} bit` : ""}` : null],
+        ["Channels", t.channels === 2 ? "Stereo" : t.channels === 1 ? "Mono" : t.channels],
+        ["Encoder", t.encoder]])}
+      <h3>File</h3>
+      ${kv([["Library", S.sources.length > 1 ? t.source : null], ["Size", fmtSize(t.file_size)], ["Modified", fmtDate(t.file_mtime)],
+        ["Cover art", t.cover_hash ? `${t.cover_w} × ${t.cover_h}, ${fmtSize(t.cover_bytes)}${t.cover_src === "folder" ? ", image file in the folder" : t.n_covers > 1 ? `, ${t.n_covers} images` : ""}` : "None"],
+        ["Lyrics", hasLyrics ? (synced ? "Embedded, time-synced" : "Embedded, plain") : (t.lrc_text ? "Only as a .lrc file next to the track" : "None")],
+        [".lrc file", t.lrc_text ? "Yes" : null]])}
+      ${[t.rg_track_gain, t.rg_track_peak, t.rg_album_gain, t.rg_album_peak].some(v => v != null) ? `<h3>ReplayGain</h3>` + kv([["Track gain", t.rg_track_gain], ["Track peak", t.rg_track_peak], ["Album gain", t.rg_album_gain], ["Album peak", t.rg_album_peak]]) : ""}
+      ${hasLyrics ? `<h3>Lyrics</h3>${synced ? `<button class="linkbtn" data-ts="1">Show timestamps</button>` : ""}<div class="lyrics">${lyricHTML}</div>` : ""}
+      ${t.lrc_text && !hasLyrics ? `<h3>Lyrics from the .lrc file</h3><div class="lyrics show-ts">${t.lrc_text.split(/\r?\n/).map(l => `<div>${esc(l)}</div>`).join("")}</div>` : ""}
+
+    </div>`;
+}
+const setTone = (el, a) => el.style.setProperty("--tone", a?.color || "var(--ink3)");
+
+/* ---------- detail dialog: artist, album, track ---------- */
+const gateOpen = () => $("#detail").classList.contains("on");
+function presentGate(from) {
+  const g = $("#detail");
+  if (!gateOpen()) {
+    // grow out of the cover (or artist mosaic) that was clicked
+    const r = (from?.querySelector?.(".mosaic, .cover") || from)?.getBoundingClientRect?.();
+    const w = g.offsetWidth, h = g.offsetHeight;
+    g.style.transformOrigin = r ? `${r.left + r.width / 2 - (innerWidth - w) / 2}px ${r.top + r.height / 2 - (innerHeight - h) / 2}px` : "50% 50%";
+  }
+  requestAnimationFrame(() => { g.classList.add("on"); $("#scrim").classList.add("on"); });
+  document.body.style.overflow = "hidden";
+  $(".close", g)?.focus({ preventScroll: true });
+}
+function enter(g, dir) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const opts = { duration: 300, easing: "cubic-bezier(.2,.7,.2,1)" }, dx = 30 * dir;
+  $(".c2", g)?.animate([{ opacity: 0, transform: `translateX(${dx}px)` }, { opacity: 1, transform: "none" }], opts);
+  for (const el of $(".c1", g)?.children || [])
+    el.animate([{ opacity: 0, transform: `translateX(${dx / 2}px)` }, { opacity: 1, transform: "none" }], { ...opts, duration: 260 });
+}
+function openAlbum(id, tid, from, backTo, dir = 1) {
+  const a = S.albumById.get(id);
+  if (!a) return;
+  const g = $("#detail");
+  S.openAlbumId = id; S.openTid = null; S.backTo = backTo || null;
+  const swap = gateOpen();
+  setTone(g, a);
+  g.classList.remove("wide");
+  g.innerHTML = `
+    <div class="c1 tint">
+      <div class="top">${backTo ? `<button class="close" data-artist="${backTo}">Back to ${esc(S.artistById.get(backTo).name)}</button>` : "<span></span>"}<button class="close" data-close="album">Close</button></div>
+      ${cover(a.cover_hash, a.title)}
+      <div class="notes"><h1 class="face">${esc(a.title)}</h1>${notesHTML(a)}</div>
+    </div>
+    <div class="c2">${tracklistHTML(a)}</div>
+    <div class="c3"></div>`;
+  presentGate(from);
+  if (swap) enter(g, dir);
+  if (tid) openTrack(tid);
+}
+function openArtist(id, from, dir = 1) {
+  const r = S.artistById.get(id);
+  if (!r) return;
+  const g = $("#detail");
+  S.artistViewId = id; S.openAlbumId = null; S.openTid = null; S.backTo = null;
+  const swap = gateOpen();
+  const albums = r.album_ids.map(i => S.albumById.get(i)).sort((a, b) => (a.year || 9999) - (b.year || 9999) || cmp(a.title, b.title));
+  const gc = new Map();
+  for (const a of albums) for (const x of a.genres) gc.set(x, (gc.get(x) || 0) + 1);
+  const genres = [...gc].sort((p, q) => q[1] - p[1]).slice(0, 6).map(x => x[0]);
+  setTone(g, albums.find(a => a.color));
+  g.classList.remove("wide");
+  g.innerHTML = `
+    <div class="c1 tint">
+      <div class="top"><span></span><button class="close" data-close="album">Close</button></div>
+      ${mosaic(r.covers, r.name)}
+      <div class="notes"><h1 class="face">${esc(r.name)}</h1>
+        <p>${[plural(r.n_albums, "album"), plural(r.n_tracks, "track"), fmtLong(r.duration)].join(", ")}</p>
+        ${genres.length ? `<div class="genres">${genres.map(x => `<button data-genre="${esc(x)}">${esc(x)}</button>`).join("")}</div>` : ""}
+        ${S.sources.length > 1 ? `<p class="small">${esc(r.source)}</p>` : ""}</div>
+    </div>
+    <div class="c2 artistview"><div class="wall">${albums.map(a => albumItem(a, false)).join("")}</div></div>
+    <div class="c3"></div>`;
+  $(".c2", g).scrollTop = 0;
+  presentGate(from);
+  if (swap) enter(g, dir);
+}
+function closeAlbum() { $("#detail").classList.remove("on", "wide"); $("#scrim").classList.remove("on"); document.body.style.overflow = ""; S.openAlbumId = S.openTid = S.backTo = S.artistViewId = null; }
+function closeInspector() {
+  S.openTid = null;
+  $("#detail").classList.remove("wide");
+  for (const r of document.querySelectorAll("#detail .tl tr.sel")) r.classList.remove("sel");
+}
+async function openTrack(tid) {
+  const t = S.byId.get(tid);
+  if (S.openAlbumId !== t.album_id) return openAlbum(t.album_id, tid, arguments[1]);
+  const g = $("#detail"), c3 = $(".c3", g);
+  S.openTid = tid;
+  for (const r of document.querySelectorAll("#detail .tl tr")) r.classList.toggle("sel", +r.dataset.tid === tid);
+  g.classList.add("wide");
+  c3.innerHTML = `<div class="c3in"><button class="close" data-close="insp">Close details</button>
+    <h2 class="face">${esc(t.title)}</h2><p>${esc(t.artist)}</p><p class="dim">Loading…</p></div>`;
+  const html = await trackBodyHTML(tid);
+  if (S.openTid !== tid) return;
+  c3.innerHTML = `<div class="c3in"><button class="close" data-close="insp">Close details</button>
+    <h2 class="face">${esc(t.title)}</h2><p>${esc(t.artist)}</p><p class="small dim">${esc([t.album, t.year].filter(Boolean).join(", "))}</p>${html}</div>`;
+  c3.scrollTop = 0;
+}
+function escapeKey() {
+  if (closeDropdowns(true)) return;
+  if (S.openTid) closeInspector();
+  else if (S.backTo) openArtist(S.backTo, null, -1);
+  else closeAlbum();
+}
+function initDetail() { $("#scrim").onclick = closeAlbum; }
+
+/* ---------- dropdowns ---------- */
+function dropdownHTML(id, label, options, value) {
+  const cur = options.find(o => o.value === value) || options[0];
+  return `<div class="dd" id="${id}">
+    <button class="dd-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="${esc(label)}: ${esc(cur.label)}">${esc(cur.label)}</button>
+    <ul class="dd-list" role="listbox" aria-label="${esc(label)}" hidden>${options.map((o, i) => `<li role="option" id="${id}-${i}" data-val="${esc(o.value)}" aria-selected="${o === cur}"><span title="${esc(o.label)}">${esc(o.label)}</span>${o.n != null ? `<small>${o.n}</small>` : ""}</li>`).join("")}</ul>
+  </div>`;
+}
+const DD_PICK = {
+  genreDD: v => { S.f.genre = v; },
+  yearDD: v => { S.f.range = v ? v.split("-").map(Number) : null; },
+  sortDD: v => { S[S.view === "albums" ? "albumSort" : "artistSort"] = v; },
+};
+function closeDropdowns(refocus) {
+  let any = false;
+  for (const dd of document.querySelectorAll(".dd")) {
+    const list = $(".dd-list", dd);
+    if (list.hidden) continue;
+    any = true; list.hidden = true;
+    const b = $(".dd-btn", dd); b.setAttribute("aria-expanded", "false");
+    if (refocus) b.focus();
+  }
+  return any;
+}
+function setActive(list, li) {
+  for (const x of list.querySelectorAll(".act")) x.classList.remove("act");
+  if (!li) return;
+  li.classList.add("act");
+  if (li.offsetTop < list.scrollTop) list.scrollTop = li.offsetTop - 6;
+  else if (li.offsetTop + li.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = li.offsetTop + li.offsetHeight - list.clientHeight + 6;
+}
+function openDropdown(dd) {
+  closeDropdowns();
+  const btn = $(".dd-btn", dd), list = $(".dd-list", dd);
+  list.hidden = false; btn.setAttribute("aria-expanded", "true");
+  // Cap the list to the room on screen (never more than 360px); flip upward if there's little room below.
+  const r = btn.getBoundingClientRect(), below = innerHeight - r.bottom - 24, above = r.top - 24;
+  const up = below < 220 && above > below;
+  list.style.maxHeight = Math.max(140, Math.min(360, up ? above : below)) + "px";
+  list.style.top = up ? "auto" : "calc(100% + 4px)";
+  list.style.bottom = up ? "calc(100% + 4px)" : "auto";
+  const sel = $("[aria-selected=true]", list);
+  list.scrollTop = sel ? sel.offsetTop - list.clientHeight / 2 + sel.offsetHeight / 2 : 0;
+  setActive(list, sel);
+}
+function pickOption(dd, li) {
+  DD_PICK[dd.id](li.dataset.val);
+  closeDropdowns();
+  render();
+  $(`#${dd.id} .dd-btn`)?.focus();
+}
+let ddBuf = "", ddTimer;
+function dropdownKey(e, list) {
+  const items = [...list.children], dd = list.parentElement;
+  const i = items.findIndex(li => li.classList.contains("act"));
+  const go = j => setActive(list, items[Math.max(0, Math.min(items.length - 1, j))]);
+  const k = e.key;
+  if (k === "ArrowDown") go(i + 1);
+  else if (k === "ArrowUp") go(i - 1);
+  else if (k === "PageDown") go(i + 7);
+  else if (k === "PageUp") go(i - 7);
+  else if (k === "Home") go(0);
+  else if (k === "End") go(items.length - 1);
+  else if (k === "Enter" || (k === " " && !ddBuf)) { if (i >= 0) pickOption(dd, items[i]); }
+  else if (k === "Escape") closeDropdowns(true);
+  else if (k === "Tab") { closeDropdowns(); return false; }
+  else if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    ddBuf += k.toLowerCase(); clearTimeout(ddTimer); ddTimer = setTimeout(() => { ddBuf = ""; }, 700);
+    const hit = items.find(li => $("span", li).textContent.toLowerCase().startsWith(ddBuf));
+    if (hit) setActive(list, hit);
+  } else return false;
+  e.preventDefault();
+  return true;
+}
+document.addEventListener("click", e => {
+  const btn = e.target.closest(".dd-btn");
+  if (btn) { const dd = btn.parentElement; return $(".dd-list", dd).hidden ? openDropdown(dd) : closeDropdowns(); }
+  const li = e.target.closest(".dd-list li");
+  if (li) return pickOption(li.closest(".dd"), li);
+  closeDropdowns();
+});
+window.addEventListener("resize", () => closeDropdowns());
+
+/* ---------- events ---------- */
+const CLICKABLE = "[data-view],[data-album],[data-artist],[data-tid],[data-col],[data-clear],[data-clearall],[data-genre],[data-decade],[data-flag],[data-close],[data-ts],[data-step]";
+document.addEventListener("click", e => {
+  const el = e.target.closest(CLICKABLE);
+  if (!el) return;
+  const d = el.dataset;
+  const leaveSheets = () => { closeAlbum(); closeInspector(); };
+  if (d.view) return setView(d.view);
+  if (d.close === "album") return closeAlbum();
+  if (d.close === "insp") return closeInspector();
+  if (d.step) return stepTrack(+d.step);
+  if (d.ts) { const l = el.nextElementSibling; l.classList.toggle("show-ts"); el.textContent = l.classList.contains("show-ts") ? "Hide timestamps" : "Show timestamps"; return; }
+  if (d.tid) return openTrack(+d.tid, el);
+  if (d.album) return openAlbum(+d.album, null, el, el.closest(".artistview") ? S.artistViewId : null);
+  if (d.artist) {
+    const r = S.artistById.get(+d.artist);
+    return r.n_albums === 1 ? openAlbum(r.album_ids[0], null, el) : openArtist(r.id, el, el.closest(".top") ? -1 : 1);
+  }
+  if (d.col) { const s = S.tableSort; s.dir = s.col === d.col ? -s.dir : 1; s.col = d.col; return render(); }
+  if (d.clear) { S.f[d.clear] = null; return render(); }
+  if (d.clearall !== undefined) return clearFilters();
+  if (d.genre) { leaveSheets(); S.f.genre = d.genre; return setView(S.view === "overview" ? "albums" : S.view); }
+  if (d.decade) { leaveSheets(); S.f.range = [+d.decade, +d.decade + 9]; return setView("albums"); }
+  if (d.flag) { leaveSheets(); S.f = { q: "", genre: "", range: null, flag: d.flag }; return setView("tracks"); }
+});
+let qTimer;
+document.addEventListener("input", e => {
+  if (e.target.id !== "q") return;
+  clearTimeout(qTimer);
+  qTimer = setTimeout(() => { S.f.q = e.target.value; renderContent(); }, 120);
+});
+document.addEventListener("keydown", e => {
+  const openList = document.querySelector(".dd-list:not([hidden])");
+  if (openList) { if (dropdownKey(e, openList)) return; }
+  else if (e.target.classList?.contains("dd-btn") && (e.key === "ArrowDown" || e.key === "ArrowUp")) { e.preventDefault(); return openDropdown(e.target.parentElement); }
+  const typing = /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName);
+  if (e.key === "Escape") escapeKey();
+  else if (e.key === "/" && !typing) { e.preventDefault(); $("#q")?.focus(); }
+  else if (e.key === "Enter" && e.target.matches("tr[data-tid]")) openInspector(+e.target.dataset.tid);
+});
+initDetail();
+const VIEWS = ["albums", "artists", "tracks", "overview"];
+window.addEventListener("hashchange", () => { const v = location.hash.slice(1); if (VIEWS.includes(v) && v !== S.view) setView(v); });
+
+load().then(() => {
+  const v = location.hash.slice(1);
+  setView(VIEWS.includes(v) ? v : "albums");
+}).catch(err => { $("#main").innerHTML = `<div class="empty"><b>The library did not load.</b>${esc(err.message)}. Check that server.py is still running, or <a href=\"/setup\">choose your folders</a>.</div>`; });
+</script>
+</body>
+</html>

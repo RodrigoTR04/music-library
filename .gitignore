@@ -1,0 +1,10 @@
+# your library: the database holds every tag, lyrics and cover thumbnail of your music
+data/
+*.db
+*.db-journal
+*.tmp
+# a demo library made by tools/make_demo_library.py
+demo-music/
+__pycache__/
+*.pyc
+.venv/

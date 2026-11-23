@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Music Library: folders</title>
+<link rel="icon" href="data:,">
+<style>
+@font-face {
+  font-family: "Archivo";
+  src: url(/fonts/Archivo.ttf) format("truetype");
+  font-weight: 100 900; font-stretch: 62% 125%; font-display: swap;
+}
+:root {
+  color-scheme: light dark;
+  --ground: #e3e5e8; --sleeve: #f6f7f8; --ink: #22252b; --ink2: #565c6b; --ink3: #7d8393;
+  --rule: #ccd0d6; --wash: #d6d9de; --mark: #2b5c9e; --gap: #9a5806;
+  --gut: 28px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --ground: #2a2e35; --sleeve: #353a43; --ink: #eceef1; --ink2: #aab1be; --ink3: #8a91a0;
+    --rule: #484e5a; --wash: #424854; --mark: #8db4e8; --gap: #e0a04a; }
+}
+@media (max-width: 720px) { :root { --gut: 16px; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--ground); color: var(--ink); font: 400 16.5px/1.45 "Archivo", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; text-align: left; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; border-radius: 2px; }
+.face { font-stretch: 70%; font-weight: 700; letter-spacing: .005em; word-spacing: .16em; line-height: 1.08; }
+
+header { display: flex; align-items: baseline; gap: 6px 28px; flex-wrap: wrap; padding: 14px var(--gut) 12px; border-bottom: 1px solid var(--rule); }
+.mark { font-size: 30px; font-stretch: 62%; font-weight: 800; margin-right: 8px; }
+header a { margin-left: auto; font-size: 14px; color: var(--ink2); text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+header a:hover { color: var(--ink); text-decoration-color: currentColor; }
+header a[hidden] { display: none; }
+
+main { max-width: 820px; padding: 44px var(--gut) 96px; }
+h1 { margin: 0 0 14px; font-size: clamp(34px, 6vw, 56px); text-wrap: balance; }
+h2 { margin: 52px 0 6px; font-size: 26px; }
+p { margin: 0 0 12px; max-width: 62ch; color: var(--ink2); }
+p.lead { color: var(--ink); font-size: 18px; }
+.note { font-size: 14px; }
+
+/* folder list: ruled rows, no boxes */
+.roots { list-style: none; margin: 18px 0 0; padding: 0; border-top: 1px solid var(--ink3); }
+.roots li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 18px; padding: 12px 0; border-bottom: 1px solid var(--rule); align-items: center; }
+.roots .name { grid-column: 1; width: min(100%, 22ch); background: transparent; border: 0; border-bottom: 1px solid transparent; border-radius: 0; padding: 2px 0; font-size: 20px; font-stretch: 78%; font-weight: 650; }
+.roots .name:hover { border-bottom-color: var(--ink3); }
+.roots .name:focus { outline: none; border-bottom: 2px solid var(--mark); margin-bottom: -1px; }
+.roots .path { grid-column: 1; color: var(--ink2); font-size: 14px; overflow-wrap: anywhere; }
+.roots .count { grid-column: 2; grid-row: 1; color: var(--ink2); font-size: 14px; text-align: right; }
+.roots .remove { grid-column: 2; grid-row: 2; justify-self: end; font-size: 14px; color: var(--ink2); text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+.roots .remove:hover { color: var(--ink); text-decoration-color: currentColor; }
+.empty { margin: 18px 0 0; padding: 14px 0; border-top: 1px solid var(--ink3); border-bottom: 1px solid var(--rule); color: var(--ink2); }
+
+.add { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 18px; margin-top: 22px; }
+.add input { flex: 1 1 320px; background: transparent; border: 0; border-bottom: 1px solid var(--ink3); border-radius: 0; padding: 6px 2px; }
+.add input::placeholder { color: var(--ink3); }
+.add input:focus { outline: none; border-bottom: 2px solid var(--mark); margin-bottom: -1px; }
+.btn { padding: 7px 16px; border: 1px solid var(--ink3); border-radius: 2px; }
+.btn:hover:not(:disabled) { border-color: var(--ink); }
+.btn.go { background: var(--ink); color: var(--ground); border-color: var(--ink); font-weight: 650; padding: 10px 24px; }
+.btn.go:hover:not(:disabled) { background: var(--mark); border-color: var(--mark); color: var(--sleeve); }
+.btn:disabled { opacity: .45; cursor: default; }
+.err { color: var(--gap); margin: 10px 0 0; font-weight: 550; max-width: 62ch; }
+.err:empty { display: none; }
+
+/* folder picker */
+.picker { margin-top: 18px; background: var(--sleeve); border: 1px solid var(--rule); border-radius: 2px; }
+.picker[hidden] { display: none; }
+.picker .where { display: flex; gap: 14px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+.picker .where b { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.picker .where small { color: var(--ink2); white-space: nowrap; }
+.picker ul { list-style: none; margin: 0; padding: 4px 0; max-height: 300px; overflow-y: auto; overscroll-behavior: contain; }
+.picker li button { display: block; width: 100%; padding: 7px 16px 7px 13px; border-left: 3px solid transparent; }
+.picker li button:hover, .picker li button:focus-visible { background: var(--wash); border-left-color: var(--ink); }
+.picker .none { padding: 10px 16px; color: var(--ink2); }
+.picker .foot { display: flex; gap: 10px; justify-content: flex-end; padding: 10px 16px; border-top: 1px solid var(--rule); }
+
+/* scanning */
+.scan { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; }
+.bar { height: 6px; background: var(--wash); border-radius: 1px; overflow: hidden; margin: 18px 0 8px; max-width: 520px; }
+.bar i { display: block; height: 100%; width: 0; background: var(--mark); }
+.bar[hidden] { display: none; }
+.status { margin: 0; color: var(--ink); min-height: 1.45em; }
+.result { margin-top: 16px; }
+.result .open { display: inline-block; margin-top: 4px; font-size: 20px; font-stretch: 78%; font-weight: 700; color: var(--ink); text-decoration-thickness: 2px; text-underline-offset: 5px; }
+.result .open:hover { color: var(--mark); }
+details { margin-top: 12px; color: var(--ink2); font-size: 14px; max-width: 70ch; }
+details summary { cursor: pointer; }
+details li { margin: 6px 0; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width .25s ease-out; } }
+</style>
+</head>
+<body>
+<header>
+  <span class="mark">Library</span>
+  <a id="toLibrary" href="/" hidden>Open the library</a>
+</header>
+<main>
+  <h1 class="face">Choose the folders your music lives in.</h1>
+  <p class="lead">Add one folder or several. The app reads the tags and cover art from every track inside them and builds a database it can browse quickly.</p>
+  <p class="note">Your files are only read, never changed. Formats: <span id="formats">mp3, flac, ogg, opus, m4a, wav, aiff</span>. Scanning takes a few seconds per thousand tracks.</p>
+
+  <h2 class="face">Folders</h2>
+  <div id="rootsArea"></div>
+
+  <div id="addArea">
+    <form class="add" id="addForm">
+      <input id="path" type="text" autocomplete="off" spellcheck="false" placeholder="/path/to/your/music" aria-label="Folder path">
+      <button class="btn" type="submit">Add folder</button>
+      <button class="btn" type="button" id="browse" aria-expanded="false">Browse</button>
+    </form>
+    <p class="err" id="addErr" role="alert"></p>
+    <div class="picker" id="picker" hidden>
+      <div class="where"><b id="here"></b><small id="hereN"></small></div>
+      <ul id="dirs"></ul>
+      <div class="foot">
+        <button class="btn" type="button" id="up">Up one level</button>
+        <button class="btn" type="button" id="useHere">Add this folder</button>
+      </div>
+    </div>
+  </div>
+  <p class="err" id="locked" role="alert" hidden>Choosing folders in the browser is turned off, because the server is open to other machines. Pass the folders on the command line instead.</p>
+
+  <h2 class="face">Scan</h2>
+  <p>Scanning builds the database from the folders above. Run it again whenever you add or retag music.</p>
+  <div class="scan"><button class="btn go" id="scan" type="button">Scan library</button></div>
+  <div class="bar" id="bar" hidden><i id="barFill"></i></div>
+  <p class="status" id="status" role="status" aria-live="polite"></p>
+  <div class="result" id="result"></div>
+</main>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const n = x => Number(x).toLocaleString();
+const plural = (x, w) => `${n(x)} ${w}${x === 1 ? "" : "s"}`;
+let roots = [], hasLibrary = false, canSetup = true, timer = null, picker = { path: "", parent: null };
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status });
+  return data;
+}
+
+function drawRoots() {
+  $("#rootsArea").innerHTML = roots.length ? `<ul class="roots">${roots.map((r, i) => `
+    <li><input class="name" value="${esc(r.label)}" data-i="${i}" aria-label="Name for ${esc(r.path)}" ${canSetup ? "" : "disabled"}>
+      <span class="count">${r.n_tracks != null ? plural(r.n_tracks, "track") : ""}</span>
+      <span class="path">${esc(r.path)}</span>
+      ${canSetup ? `<button class="remove" data-rm="${i}" aria-label="Remove ${esc(r.label)}">Remove</button>` : ""}</li>`).join("")}</ul>`
+    : `<p class="empty">No folders yet. Add one below.</p>`;
+  $("#scan").disabled = !roots.length || !canSetup;
+  $("#toLibrary").hidden = !hasLibrary;
+}
+
+async function saveRoots(next) {
+  roots = (await api("/api/config", { roots: next.map(({ label, path }) => ({ label, path })) })).roots
+    .map(r => ({ ...r, n_tracks: (roots.find(o => o.path === r.path) || {}).n_tracks }));
+  drawRoots();
+}
+
+async function addPath(path) {
+  $("#addErr").textContent = "";
+  if (!path.trim()) return;
+  try {
+    await saveRoots([...roots, { path: path.trim() }]);
+    $("#path").value = "";
+    closePicker();
+  } catch (e) { $("#addErr").textContent = e.message; }
+}
+
+/* ---- folder picker */
+function closePicker() { $("#picker").hidden = true; $("#browse").setAttribute("aria-expanded", "false"); }
+async function browse(path) {
+  try {
+    const d = await api("/api/fs?path=" + encodeURIComponent(path || ""));
+    picker = d;
+    $("#picker").hidden = false;
+    $("#browse").setAttribute("aria-expanded", "true");
+    $("#here").textContent = d.path;
+    $("#hereN").textContent = d.audio ? plural(d.audio, "audio file") + " here" : "";
+    $("#up").disabled = !d.parent;
+    $("#dirs").innerHTML = d.note ? `<li class="none">${esc(d.note)}</li>` : d.dirs.length
+      ? d.dirs.map(x => `<li><button type="button" data-dir="${esc(x.path)}">${esc(x.name)}</button></li>`).join("")
+      : `<li class="none">No folders inside.</li>`;
+    $("#dirs").scrollTop = 0;
+  } catch (e) { $("#addErr").textContent = e.message; }
+}
+$("#browse").onclick = () => $("#picker").hidden ? browse($("#path").value.trim()) : closePicker();
+$("#up").onclick = () => picker.parent && browse(picker.parent);
+$("#useHere").onclick = () => addPath(picker.path);
+$("#dirs").onclick = e => {
+  const b = e.target.closest("[data-dir]");
+  if (b) browse(b.dataset.dir);
+};
+$("#addForm").onsubmit = e => { e.preventDefault(); addPath($("#path").value); };
+
+/* ---- folder list */
+$("#rootsArea").onclick = async e => {
+  const b = e.target.closest("[data-rm]");
+  if (b) try { await saveRoots(roots.filter((_, i) => i !== +b.dataset.rm)); } catch (err) { $("#addErr").textContent = err.message; }
+};
+$("#rootsArea").onchange = async e => {
+  if (!e.target.classList.contains("name")) return;
+  const next = roots.map((r, i) => i === +e.target.dataset.i ? { ...r, label: e.target.value } : r);
+  try { await saveRoots(next); } catch (err) { $("#addErr").textContent = err.message; drawRoots(); }
+};
+
+/* ---- scanning */
+const PHASES = { finding: "Looking for audio files", reading: "Reading tags and covers", deriving: "Building the browsing tables" };
+function drawScan(s) {
+  const running = s.state === "running";
+  $("#scan").disabled = running || !roots.length || !canSetup;
+  $("#bar").hidden = !running;
+  $("#result").innerHTML = "";
+  if (running) {
+    const known = s.phase === "reading" && s.total;
+    $("#barFill").style.width = known ? (s.done / s.total * 100) + "%" : s.phase === "deriving" ? "100%" : "4%";
+    $("#status").textContent = known ? `${PHASES.reading}: ${n(s.done)} of ${n(s.total)}`
+      : s.phase === "finding" && s.done ? `${PHASES.finding}: ${n(s.done)} so far` : PHASES[s.phase] || "Working";
+  } else if (s.state === "error") {
+    $("#status").innerHTML = `<span class="err">${esc(s.message)}</span>`;
+  } else if (s.state === "done") {
+    $("#status").textContent = "";
+    $("#result").innerHTML = `<p>Scanned ${plural(s.tracks, "track")} on ${plural(s.albums, "album")} by ${plural(s.artists, "artist")} in ${s.seconds} seconds.</p>
+      <a class="open" href="/">Open the library</a>
+      ${s.n_unreadable ? `<details><summary>${plural(s.n_unreadable, "file")} could not be read</summary><ul>${s.unreadable.map(u => `<li>${esc(u.path)}: ${esc(u.error)}</li>`).join("")}</ul></details>` : ""}`;
+  } else $("#status").textContent = "";
+}
+async function poll() {
+  clearTimeout(timer);
+  try {
+    const s = await api("/api/scan");
+    drawScan(s);
+    if (s.state === "running") timer = setTimeout(poll, 400);
+    else if (s.state === "done") { hasLibrary = true; await load(false); }
+  } catch { timer = setTimeout(poll, 1500); }
+}
+$("#scan").onclick = async () => {
+  $("#addErr").textContent = "";
+  try { drawScan(await api("/api/scan", { roots: roots.map(({ label, path }) => ({ label, path })) })); poll(); }
+  catch (e) { $("#status").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+};
+
+async function load(first = true) {
+  const c = await api("/api/config");
+  roots = c.roots; hasLibrary = c.has_library; canSetup = c.can_setup;
+  $("#addArea").hidden = !canSetup;
+  $("#locked").hidden = canSetup;
+  $("#path").placeholder = c.home + "/Music";
+  drawRoots();
+  if (first) { drawScan(c.scan); if (c.scan.state === "running") poll(); }
+}
+load().catch(e => { $("#status").textContent = "Could not reach the server: " + e.message; });
+</script>
+</body>
+</html>
