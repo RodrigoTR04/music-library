@@ -7,6 +7,43 @@ that database, so it stays fast and never touches your files again.
 
 It does not play audio. Use whatever player you already have; this is for seeing and checking your metadata.
 
+![The album wall: every album as its cover, with search, genre, decade and sort controls](docs/screenshots/albums.png)
+
+## What you get
+
+Screenshots show the demo library from `tools/make_demo_library.py` (invented artists, one-second tones), not real music.
+
+**Albums, as a wall of covers.** Search across title, artist, album, genre, composer and publisher; filter by genre
+or decade; sort by artist, title, year, track count, length or recently changed. Albums from a second or third folder carry that folder's name.
+
+**An album, and any track in it.** Select an album to open its sheet, tinted with the cover's dominant colour, with
+the tracklist beside it. Select a track for everything the file knows: every tag, codec, bitrate, sample rate and bit
+depth, size, cover resolution, ReplayGain, lyrics (with or without timestamps) and where the cover came from.
+
+![An album sheet with its tracklist and the details of the first track](docs/screenshots/album-and-track.png)
+
+**Artists.** An artist with several albums opens to a sheet of all of them; an artist with one album opens that album directly.
+
+![An artist's sheet showing their three albums](docs/screenshots/artist.png)
+
+**Tracks, as a table.** Sortable columns, the same filters, and marks for lyrics and MusicBrainz ids.
+
+![The track table filtered to one genre](docs/screenshots/tracks.png)
+
+**Overview.** Every album as a block in the colour of its cover, stacked by release year; the largest genres and artists;
+and a list of gaps in your tags (no track number, no lyrics, no cover, possible duplicates...) where each row opens the
+tracks that are missing it.
+
+![The overview: albums by year in cover colours, genres, and artists](docs/screenshots/overview.png)
+
+**Light and dark**, following your system setting.
+
+![The album sheet in dark mode](docs/screenshots/dark.png)
+
+**Choosing folders.** Type a path or browse, name each folder, scan, with live progress.
+
+![The folder setup page after a scan](docs/screenshots/setup.png)
+
 ## Run it
 
 Needs Python 3.9 or newer (developed on 3.14).
@@ -25,8 +62,8 @@ Several folders, each shown as its own library:
 Or start with no arguments and choose folders in the browser (**Folders** in the top bar): type a path or
 browse, name each folder, then press **Scan library**.
 
-Try it without your own music: `python3 tools/make_demo_library.py demo-music` makes a small invented
-library (needs ffmpeg), then `python3 server.py demo-music/Albums demo-music/Singles demo-music/Soundtracks`.
+Try it without your own music: `python3 tools/make_demo_library.py demo-music` makes an invented library
+of about 80 albums (needs ffmpeg), then `python3 server.py demo-music/Albums demo-music/Singles demo-music/Soundtracks`.
 
 | Option | |
 | --- | --- |

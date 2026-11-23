@@ -63,6 +63,40 @@ SOUNDTRACKS = [  # Album/ (CD1, CD2) and folder art, no embedded pictures
 LYRICS = "[00:00.50]Lantern in the window\n[00:03.00]Somebody left it on\n"
 
 
+ADJ = "Velvet Copper Paper Silent Amber Hollow Neon Salted Wandering Quiet Crimson Pale Brass Drifting Winter Marble Electric Little Glass Broken Golden Distant Wild Slow Iron Fading".split()
+NOUN = "Lanterns Harbour Orchard Atlas Meridian Foxes Engines Gardens Signals Pilots Ferries Kites Anchors Rivers Mirrors Coats Stations Choir Cartographers Sparrows Lighthouse Tides Embers".split()
+FIRST = "Imogen Marlowe Tobias Anselm Delphine Rosalind Caspian Odette Lucan Marguerite Idris Philippa Soren Linnea Tamsin Evander".split()
+LAST = "Fell Vance Okafor Lindqvist Marsh Calloway Reyes Thorne Vasquez Hartley Ibsen Quill Navarro Pike Sorrel Whitlock".split()
+WORDS = "Salt Rain Ladder Kettle Static Harbour Pear Wire Cousin Antenna Daybreak Landline Borrowed Coat Frost Platform Ash Gull Rope Fog Signal Arrival Departure Window Summer Machine Bees Fence Atlas Waltz Afterglow Pigeon Roof Blue Mile Lantern Orchard Tide Letter Light Chair Season Cold Reel Pilot Sundial Weather Tin Boat".split()
+GENRES = ["Rock", "Alternative", "Folk", "Pop", "Jazz", "Electronic", "Ambient", "Indie", "Singer-Songwriter", "Soul", "Blues", "Classical", "Hip-Hop", "Punk", "Country", "Metal"]
+
+
+def more_albums(n=64):
+    """A deterministic crowd of invented albums so the wall, the year chart and the lists have something to show."""
+    rnd = random.Random(7)
+    artists = []
+    while len(artists) < 26:
+        name = f"The {rnd.choice(ADJ)} {rnd.choice(NOUN)}" if rnd.random() < .45 else f"{rnd.choice(FIRST)} {rnd.choice(LAST)}"
+        if name not in artists and name not in {a[0] for a in ALBUMS}:
+            artists.append(name)
+    out, used = [], set()
+    for i in range(n):
+        artist = artists[i % len(artists)]
+        album = " ".join(rnd.sample(WORDS, rnd.choice([1, 2, 2, 3])))
+        if (artist, album) in used:
+            continue
+        used.add((artist, album))
+        year = min(2024, int(rnd.triangular(1966, 2024, 2008)))
+        genre = "; ".join(rnd.sample(GENRES, rnd.choice([1, 1, 2])))
+        titles = []
+        while len(titles) < rnd.randint(4, 9):
+            t = " ".join(rnd.sample(WORDS, rnd.choice([1, 2, 2, 3])))
+            if t not in titles:
+                titles.append(t)
+        out.append((artist, album, year, genre, rnd.choice([".mp3", ".mp3", ".flac", ".flac", ".m4a", ".ogg", ".opus"]), titles, rnd.random()))
+    return out
+
+
 def hash_seed(s):
     return zlib.crc32(s.encode())
 
@@ -124,7 +158,7 @@ def main():
     if out.exists() and any(out.iterdir()):
         raise SystemExit(f"{out} already has files in it; pick an empty or new folder.")
 
-    for artist, album, year, genre, ext, titles, hue in ALBUMS:
+    for artist, album, year, genre, ext, titles, hue in ALBUMS + more_albums():
         for i, title in enumerate(titles, 1):
             tags = dict(title=title, artist=artist, album=album, album_artist=artist, track=f"{i}/{len(titles)}",
                         date=str(year), genre=genre)
